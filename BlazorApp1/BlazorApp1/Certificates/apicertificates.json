@@ -1,0 +1,10 @@
+{
+  "CertificateType": "File",
+  "StoreName": "Disallowed",
+  "StoreLocation": "LocalMachine",
+  "SigningCert": "apicertificate.pfx",
+  "SigningPassword": "1234",
+  "EncryptionCert": "apicertificate.pfx",
+  "EncryptionPassword": "1234"
+
+}
