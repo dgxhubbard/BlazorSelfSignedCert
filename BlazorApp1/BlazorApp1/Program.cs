@@ -1,13 +1,22 @@
-using BlazorApp1.Client.Pages;
-using BlazorApp1.Components;
 
 using System.Security.Cryptography;
 using System.Diagnostics;
-using BlazorApp1.Enums;
-using Microsoft.AspNetCore.Server.Kestrel.Https;
-using static System.Formats.Asn1.AsnWriter;
 using System.Net;
 using System.Security.Cryptography.X509Certificates;
+using System.Net.Security;
+
+using Microsoft.AspNetCore.Authentication.Certificate;
+using Microsoft.AspNetCore.Server.Kestrel.Https;
+using Microsoft.Extensions.Logging;
+
+
+using BlazorApp1.Client.Pages;
+using BlazorApp1.Components;
+using BlazorApp1.Enums;
+using Microsoft.Extensions.DependencyInjection;
+using System.Security.Authentication;
+
+
 
 namespace BlazorApp1
 {
@@ -81,6 +90,8 @@ namespace BlazorApp1
 
                     var ipAddress = IPAddress.Parse ( "127.0.0.1" );
 
+
+                    /*
                     if ( apiCertificates.CertificateType == CertificateType.File )
                     {
                         var certPath = apiCertificates.EncryptionCert;
@@ -99,9 +110,9 @@ namespace BlazorApp1
 
                     else
                     {
-                        var storeName = apiCertificates.StoreName;
-                        var storeLocation = apiCertificates.StoreLocation;
-                        var subject = apiCertificates.EncryptionCert;
+                        var storeName = StoreName.Root; //apiCertificates.StoreName;
+                        var storeLocation = StoreLocation.LocalMachine; //apiCertificates.StoreLocation;
+                        var subject = "AAA Certificate";     //apiCertificates.EncryptionCert;
 
                         Debug.WriteLine ( "Using stored certificate StoreName: " + storeName + " StoreLocation: " + storeLocation );
                         store = new X509Store ( storeName, storeLocation );
@@ -120,28 +131,73 @@ namespace BlazorApp1
 
 
                     }
+                    
 
-                    var httpsConnectionAdapterOptions = new HttpsConnectionAdapterOptions
-                    {
-                        SslProtocols = System.Security.Authentication.SslProtocols.Tls12,
-                        ClientCertificateMode = ClientCertificateMode.AllowCertificate,
-                        ServerCertificate = apiCert
-
-                    };
-
+                    // ERR_SSL_PROTOCOL_ERROR
+                    
                     builder.WebHost.ConfigureKestrel (
                         options =>
                         {
-                            options.ConfigureEndpointDefaults (
-                                listenOptions =>
-                                    listenOptions.UseHttps ( httpsConnectionAdapterOptions ) );
+                            options.ConfigureHttpsDefaults ( options =>
+                            {
 
+                                options.SslProtocols = System.Security.Authentication.SslProtocols.Tls12;
+                                options.ServerCertificate = apiCert;
+
+                                options.AllowAnyClientCertificate ();
+                                options.ClientCertificateMode = ClientCertificateMode.AllowCertificate;
+                            } );
 
                             options.Listen (
                                 ipAddress, port );
 
 
                         } );
+                        
+                    */
+
+                    
+                    // this setup works with self signed cert
+                    // but will show as insecure
+                    // not sure what tls defaults are
+                    
+                    builder.WebHost.ConfigureKestrel (
+                        options =>
+                        {
+                            var port = apiPorts.Port;
+
+                            if ( apiCertificates.CertificateType == CertificateType.File )
+                            {
+                                var pfxFilePath = apiCertificates.EncryptionCert;
+                                var pfxPassword = apiCertificates.EncryptionPassword;
+
+                                options.Listen (
+                                    ipAddress, port,
+                                    listenOptions =>
+                                    {
+                                        // Configure Kestrel to use a certificate from a local .PFX file for hosting HTTPS
+                                        listenOptions.UseHttps ( pfxFilePath, pfxPassword );
+                                    } );
+                            }
+                            else
+                            {
+                                var storeName = apiCertificates.StoreName;
+                                var storeLocation = apiCertificates.StoreLocation;
+                                var subject = apiCertificates.EncryptionCert;
+
+                                options.Listen (
+                                    ipAddress, port,
+                                    listenOptions =>
+                                    {
+                                        // Configure Kestrel to use a certificate from a local .PFX file for hosting HTTPS
+                                        listenOptions.UseHttps ( storeName, subject, false, storeLocation );
+                                    } );
+                            }
+                        } );
+                       
+                    
+
+
                 }
 
 
@@ -149,6 +205,12 @@ namespace BlazorApp1
                 builder.Services.AddRazorComponents ()
                     .AddInteractiveServerComponents ()
                     .AddInteractiveWebAssemblyComponents ();
+
+                builder.Services.AddLogging ( loggingBuilder => loggingBuilder
+                    .AddConsole ()
+                    .AddDebug ()
+                    .SetMinimumLevel ( LogLevel.Trace ) );
+
 
                 var app = builder.Build ();
 
@@ -207,6 +269,11 @@ namespace BlazorApp1
 
             }
 
+        }
+
+        private static bool ClientCertificateValidation ( X509Certificate2 arg1, X509Chain arg2, SslPolicyErrors arg3 )
+        {
+            return true;
         }
     }
 }

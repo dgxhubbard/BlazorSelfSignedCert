@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Runtime.ConstrainedExecution;
 using System.Runtime.InteropServices;
 using System.Security;
 using System.Security.AccessControl;
@@ -101,26 +102,6 @@ namespace GenerateCert
 
         static void Main ( string [] arguments )
 		{
-            var commonName = "GAGEtrak IDP";
-            var store = new X509Store ( "Root", StoreLocation.LocalMachine );
-
-            store.Open ( OpenFlags.ReadOnly );
-            var items = store.Certificates.Find ( X509FindType.FindBySubjectName, commonName, false );
-
-            X509Certificate2 item = null;
-            if ( items != null && items.Count > 0 ) 
-            { 
-                item = items [0];
-            }
-
-            string info = null;
-            if ( item != null ) 
-            { 
-                info = item.ToString ( true );
-            }
-
-
-
             var args = arguments.ToList ();
 
             args.Reverse ();
@@ -275,6 +256,7 @@ namespace GenerateCert
 
             request.CertificateExtensions.Add ( sanBuilder.Build () );
 
+
             request.CertificateExtensions.Add (
                 new X509KeyUsageExtension (
                         X509KeyUsageFlags.DigitalSignature |
@@ -283,6 +265,9 @@ namespace GenerateCert
                     critical: true ) );
 
             var certificate = request.CreateSelfSigned ( DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddYears ( Years ) );
+
+
+            certificate = RSACertificateExtensions.CopyWithPrivateKey ( certificate, algorithm );
 
 
             bool isWindows = System.Runtime.InteropServices.RuntimeInformation
