@@ -156,6 +156,7 @@ namespace BlazorApp1
                         
                     */
 
+
                     
                     // this setup works with self signed cert
                     // but will show as insecure
